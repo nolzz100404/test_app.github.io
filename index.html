@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nolzz_GPS — Anti-Theft Phone Security & Live GPS Tracker</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Leaflet.js CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'radar': 'radarPing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                    },
+                    keyframes: {
+                        radarPing: {
+                            '0%': { transform: 'scale(0.8)', opacity: '0.8' },
+                            '100%': { transform: 'scale(2.8)', opacity: '0' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Leaflet Dark Theme Overrides */
+        .leaflet-container {
+            background: #0b1120 !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.8) !important;
+            color: #64748b !important;
+            font-size: 10px !important;
+            border-top-left-radius: 8px;
+        }
+
+        .leaflet-control-attribution a {
+            color: #38bdf8 !important;
+        }
+
+        .leaflet-control-zoom a {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background-color: #334155 !important;
+        }
+
+        /* Custom Pulsing Map Marker */
+        .gps-marker-container {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gps-radar-ring {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: rgba(6, 182, 212, 0.45);
+            animation: radarPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .gps-radar-ring.stolen {
+            background-color: rgba(239, 68, 68, 0.6);
+            animation: radarPing 1.1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .gps-core-dot {
+            position: relative;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background-color: #06b6d4;
+            border: 3px solid #ffffff;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.9);
+            z-index: 10;
+        }
+
+        .gps-core-dot.stolen {
+            background-color: #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 1);
+        }
+
+        /* Stolen Mode High-Alert Border Glow */
+        .stolen-alert-glow {
+            box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.6), 0 0 30px rgba(239, 68, 68, 0.15);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+
+    <!-- ==========================================
+         1. AUTHENTICATION & EMAIL BINDING VIEW
+    =========================================== -->
+    <div id="auth-view" class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-950">
+        <!-- Ambient Background Orbs -->
+        <div class="absolute top-1/4 -left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div
+            class="absolute bottom-1/4 -right-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none">
+        </div>
+
+        <div
+            class="w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10">
+            <!-- Brand Header -->
+            <div class="flex flex-col items-center text-center mb-8">
+                <div
+                    class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 p-[1px] shadow-lg shadow-cyan-500/20 mb-4">
+                    <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
+                        <i data-lucide="radar" class="w-7 h-7 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div
+                    class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    Anti-Theft Satellite Telemetry
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">Nolzz<span
+                        class="text-cyan-400">_GPS</span></h1>
+                <p class="text-slate-400 text-sm mt-1.5">Bind your phone to your email address to track, lock, and
+                    recover stolen devices in real time.</p>
+            </div>
+
+            <!-- Auth Tabs -->
+            <div class="grid grid-cols-2 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-6">
+                <button type="button" id="tab-login" onclick="switchAuthTab('login')"
+                    class="py-2 text-xs sm:text-sm font-semibold rounded-lg bg-slate-800 text-white shadow transition">
+                    Sign In & Track
+                </button>
+                <button type="button" id="tab-register" onclick="switchAuthTab('register')"
+                    class="py-2 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition">
+                    Link New Phone
+                </button>
+            </div>
+
+            <!-- Login / Link Form -->
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Account Email (Phone Binding
+                        ID)</label>
+                    <div class="relative">
+                        <i data-lucide="mail"
+                            class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="email" id="auth-email" required placeholder="you@example.com"
+                            value="alex.security@nolzz.io"
+                            class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Security Passcode / Password</label>
+                    <div class="relative">
+                        <i data-lucide="lock"
+                            class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="password" id="auth-password" required placeholder="••••••••••••"
+                            value="NolzzSecure2026"
+                            class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition">
+                    </div>
+                </div>
+
+                <!-- Extra Device Name Field shown when "Link New Phone" is selected -->
+                <div id="register-device-field" class="hidden">
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Primary Phone Model Name</label>
+                    <div class="relative">
+                        <i data-lucide="smartphone"
+                            class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="auth-device-name" placeholder="e.g., Samsung Galaxy S24 Ultra"
+                            class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition">
+                    </div>
+                </div>
+
+                <button type="submit" id="auth-submit-btn"
+                    class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Access GPS Command Center</span>
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-slate-800"></div>
+                </div>
+                <div class="relative flex justify-center text-xs">
+                    <span class="px-3 bg-slate-900 text-slate-500">Instant Testing</span>
+                </div>
+            </div>
+
+            <!-- Demo Mode Button -->
+            <button type="button" onclick="enterDemoMode()"
+                class="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 font-medium text-sm transition flex items-center justify-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                <span>Launch Instant Demo Mode</span>
+            </button>
+
+            <p class="text-[11px] text-slate-500 text-center mt-5 leading-relaxed">
+                End-to-end encrypted location telemetry. Pair your mobile phone browser beacon with the same email for
+                live recovery.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         2. MAIN SECURITY DASHBOARD VIEW
+    =========================================== -->
+    <div id="dashboard-view" class="hidden min-h-screen flex flex-col">
+
+        <!-- Top Navigation Bar -->
+        <header id="top-navbar"
+            class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3 transition-colors duration-300">
+            <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+                <!-- Left: Logo & Alert Pill -->
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 p-[1px]">
+                        <div class="w-full h-full bg-slate-950 rounded-xl flex items-center justify-center">
+                            <i data-lucide="radar" class="w-5 h-5 text-cyan-400"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-lg tracking-tight text-white">Nolzz<span
+                                    class="text-cyan-400">_GPS</span></span>
+                            <span id="global-status-badge"
+                                class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                PROTECTED
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 hidden sm:block">Anti-Theft Satellite & Cellular
+                            Positioning</p>
+                    </div>
+                </div>
+
+                <!-- Right: Linked Email Pill, Beacon Mode & Logout -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Mobile Beacon Toggle (Uses Real Browser Geolocation if user wants to test on their actual phone) -->
+                    <button onclick="useRealDeviceGPS()" title="Sync with this browser's real HTML5 GPS location"
+                        class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-cyan-300 flex items-center gap-1.5 transition">
+                        <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                        <span class="hidden md:inline">Sync My Real GPS</span>
+                    </button>
+
+                    <!-- Linked Email Badge -->
+                    <div
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                        <i data-lucide="link" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span class="text-slate-400 hidden sm:inline">Linked:</span>
+                        <span id="display-user-email"
+                            class="font-mono text-slate-200 font-medium truncate max-w-[130px] sm:max-w-[200px]">alex.security@nolzz.io</span>
+                    </div>
+
+                    <!-- Cloud / Firebase Connection Status & Config Button -->
+                    <button onclick="openFirebaseModal()" id="cloud-status-btn"
+                        title="Configure Firebase Cloud Database"
+                        class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-amber-300 flex items-center gap-1.5 transition">
+                        <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <span id="cloud-status-text" class="hidden sm:inline">Local Mode</span>
+                        <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </button>
+
+                    <!-- Logout -->
+                    <button onclick="logout()" title="Sign Out"
+                        class="p-2 rounded-xl bg-slate-800/70 hover:bg-red-500/20 hover:text-red-400 border border-slate-700/80 text-slate-400 transition">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- High-Alert Stolen Mode Banner (Hidden unless Stolen Mode is Active) -->
+        <div id="stolen-banner"
+            class="hidden bg-gradient-to-r from-red-950 via-red-900/90 to-red-950 border-b border-red-500/40 px-4 py-2.5 text-red-100">
+            <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+                <div class="flex items-center gap-2.5 font-semibold">
+                    <span class="flex h-2.5 w-2.5 relative">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                    <span>LOST / STOLEN MODE ACTIVE: High-frequency 5-second GPS tracking enabled & lock-screen warning
+                        broadcasted.</span>
+                </div>
+                <button onclick="toggleLostMode()"
+                    class="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-400/40 text-xs font-bold text-white transition">
+                    Deactivate Alert
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Workspace Grid -->
+        <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+            <!-- ==========================================
+                 LEFT SIDEBAR: DEVICES & ANTI-THEFT ACTIONS
+            =========================================== -->
+            <aside class="lg:col-span-4 xl:col-span-3 flex flex-col gap-5">
+
+                <!-- Linked Devices Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i data-lucide="smartphone" class="w-4 h-4 text-cyan-400"></i>
+                            Linked Devices (<span id="device-count">2</span>)
+                        </h2>
+                        <button onclick="openAddDeviceModal()"
+                            class="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg border border-cyan-500/20 transition">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Bind Phone
+                        </button>
+                    </div>
+
+                    <!-- Device Selector List -->
+                    <div id="device-list" class="space-y-2.5">
+                        <!-- Dynamically Populated -->
+                    </div>
+                </div>
+
+                <!-- LIVE PHONE BEACON MODE CARD (Turn THIS Phone into a Tracked Device) -->
+                <div id="beacon-card"
+                    class="bg-gradient-to-br from-cyan-950/50 via-slate-900 to-slate-900 border border-cyan-500/30 rounded-2xl p-4 shadow-xl transition-all">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <div id="beacon-icon-wrap"
+                                class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                                <i data-lucide="radio" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xs sm:text-sm font-bold text-white">Broadcast This Phone's GPS</h3>
+                                <p id="beacon-subtext" class="text-[11px] text-slate-400">Send live GPS & battery to
+                                    Cloud</p>
+                            </div>
+                        </div>
+                        <button id="beacon-toggle" onclick="toggleLiveBeacon()" role="switch" aria-checked="false"
+                            class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-700 transition-colors duration-200 ease-in-out focus:outline-none">
+                            <span id="beacon-knob"
+                                class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
+                        </button>
+                    </div>
+                    <div id="beacon-live-pill"
+                        class="hidden mt-3 pt-2.5 border-t border-cyan-500/20 flex items-center justify-between text-[11px] text-cyan-300 font-mono">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            LIVE BEACON TRANSMITTING
+                        </span>
+                        <span id="beacon-ping-counter">0 pings</span>
+                    </div>
+                </div>
+
+                <!-- Anti-Theft & Lost Mode Control Panel -->
+                <div id="controls-card"
+                    class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl transition-all duration-300">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i data-lucide="shield-alert" class="w-4 h-4 text-red-400"></i>
+                            Anti-Theft Command Center
+                        </h2>
+                        <span id="sim-indicator"
+                            class="hidden text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                            LIVE TRACKING
+                        </span>
+                    </div>
+
+                    <!-- 1. Mark as Stolen / Lost Mode Toggle -->
+                    <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 mb-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm font-bold text-white flex items-center gap-1.5">
+                                    Lost / Stolen Mode
+                                </div>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Locks screen & forces continuous GPS ping
+                                </p>
+                            </div>
+                            <button id="lost-mode-toggle" onclick="toggleLostMode()" role="switch" aria-checked="false"
+                                class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-700 transition-colors duration-200 ease-in-out focus:outline-none">
+                                <span id="lost-mode-knob"
+                                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
+                            </button>
+                        </div>
+
+                        <!-- Custom Lock Screen Broadcast Message -->
+                        <div class="mt-3 pt-3 border-t border-slate-800/80">
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">Lock-Screen Recovery
+                                Message</label>
+                            <div class="flex gap-1.5">
+                                <input type="text" id="lock-message-input"
+                                    value="STOLEN PHONE! Return to owner: +855-12-345-678"
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-cyan-500 outline-none">
+                                <button onclick="broadcastMessage()"
+                                    class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-400 border border-slate-700 shrink-0 transition">
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Action Buttons Grid -->
+                    <div class="grid grid-cols-1 gap-2.5">
+                        <!-- Trigger Loud Alarm / Siren -->
+                        <button id="siren-btn" onclick="toggleSiren()"
+                            class="w-full p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-xs sm:text-sm flex items-center justify-between transition group">
+                            <span class="flex items-center gap-2.5">
+                                <span
+                                    class="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 group-hover:scale-110 transition">
+                                    <i data-lucide="volume-2" class="w-4 h-4"></i>
+                                </span>
+                                <span id="siren-btn-text">Trigger Loud Alarm / Siren</span>
+                            </span>
+                            <span id="siren-status"
+                                class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-950 text-slate-400">OFF</span>
+                        </button>
+
+                        <!-- Remote Lock Device -->
+                        <button onclick="remoteLockDevice()"
+                            class="w-full p-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-semibold text-xs sm:text-sm flex items-center justify-between transition group">
+                            <span class="flex items-center gap-2.5">
+                                <span
+                                    class="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:scale-110 transition">
+                                    <i data-lucide="lock" class="w-4 h-4"></i>
+                                </span>
+                                <span>Remote Lock Device</span>
+                            </span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-cyan-500/70"></i>
+                        </button>
+
+                        <!-- Simulate Thief Movement -->
+                        <button id="simulate-move-btn" onclick="toggleThiefSimulation()"
+                            class="w-full p-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-semibold text-xs sm:text-sm flex items-center justify-between transition group">
+                            <span class="flex items-center gap-2.5">
+                                <span
+                                    class="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 group-hover:scale-110 transition">
+                                    <i data-lucide="navigation" class="w-4 h-4"></i>
+                                </span>
+                                <span id="simulate-btn-text">Simulate Thief Movement</span>
+                            </span>
+                            <span id="simulate-badge"
+                                class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-950 text-indigo-400">TEST</span>
+                        </button>
+
+                        <!-- Remote Wipe Data -->
+                        <button onclick="openWipeModal()"
+                            class="w-full p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold text-xs sm:text-sm flex items-center justify-between transition group mt-1">
+                            <span class="flex items-center gap-2.5">
+                                <span
+                                    class="p-1.5 rounded-lg bg-red-500/20 text-red-400 group-hover:scale-110 transition">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </span>
+                                <span>Remote Wipe Data</span>
+                            </span>
+                            <span
+                                class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-500/30">DANGER</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Companion Mobile Beacon Info Guide -->
+                <div
+                    class="bg-gradient-to-br from-slate-900 to-slate-900/60 border border-cyan-500/20 rounded-2xl p-4 shadow-lg">
+                    <div class="flex items-start gap-3">
+                        <div class="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 shrink-0 mt-0.5">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-white">Cross-Phone Cloud Tracking Guide</h3>
+                            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                1. Connect your <button onclick="openFirebaseModal()"
+                                    class="text-cyan-400 underline font-semibold">Firebase Config</button>.<br>
+                                2. Open this link on <strong>Phone A</strong>, sign in with <span id="guide-email"
+                                    class="text-slate-200 font-mono">alex.security@nolzz.io</span>, and turn ON
+                                <strong>Broadcast This Phone's GPS</strong>.<br>
+                                3. Sign in with the same email on <strong>Phone B / PC</strong> to track or lock Phone A
+                                live!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- ==========================================
+                 RIGHT MAIN VIEWPORT: MAP, TELEMETRY & LOGS
+            =========================================== -->
+            <section class="lg:col-span-8 xl:col-span-9 flex flex-col gap-5">
+
+                <!-- Device Telemetry Strip (4 Metric Cards) -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    <!-- Battery -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3">
+                        <div id="battery-icon-box"
+                            class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                            <i data-lucide="battery-charging" class="w-5 h-5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] text-slate-400 font-medium">Battery Level</p>
+                            <p id="telemetry-battery" class="text-base sm:text-lg font-bold text-white truncate">84%</p>
+                        </div>
+                    </div>
+
+                    <!-- Network -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+                            <i data-lucide="wifi" class="w-5 h-5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] text-slate-400 font-medium">Network / Signal</p>
+                            <p id="telemetry-network" class="text-base sm:text-lg font-bold text-white truncate">5G
+                                Ultra • -68dBm</p>
+                        </div>
+                    </div>
+
+                    <!-- Device ID / IMEI -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                            <i data-lucide="cpu" class="w-5 h-5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] text-slate-400 font-medium">IMEI / Hardware ID</p>
+                            <p id="telemetry-imei"
+                                class="text-xs sm:text-sm font-mono font-semibold text-slate-200 truncate">
+                                358942109482110</p>
+                        </div>
+                    </div>
+
+                    <!-- Last Ping -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                            <i data-lucide="clock" class="w-5 h-5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] text-slate-400 font-medium">Last GPS Ping</p>
+                            <p id="telemetry-ping" class="text-sm sm:text-base font-bold text-emerald-400 truncate">Just
+                                now</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Live GPS Map Container -->
+                <div id="map-wrapper"
+                    class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative">
+                    <!-- Map Top Overlay Bar -->
+                    <div
+                        class="p-3.5 sm:px-5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 z-20">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 id="map-device-title" class="text-sm font-bold text-white truncate">My Primary
+                                        Phone (Samsung Galaxy S24)</h3>
+                                    <span id="map-accuracy-badge"
+                                        class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 shrink-0">
+                                        ±12m Accuracy
+                                    </span>
+                                </div>
+                                <p id="map-address" class="text-xs text-slate-400 truncate mt-0.5">Preah Sisowath Quay,
+                                    Daun Penh, Phnom Penh</p>
+                            </div>
+                        </div>
+
+                        <!-- Coordinates & Map Style Controls -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="copyCoordinates()" title="Copy GPS Coordinates"
+                                class="px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-cyan-300 flex items-center gap-1.5 transition">
+                                <span id="map-coords">11.5682° N, 104.9312° E</span>
+                                <i data-lucide="copy" class="w-3 h-3 text-slate-400"></i>
+                            </button>
+
+                            <button onclick="recenterMap()"
+                                class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white border border-slate-700 flex items-center gap-1 transition">
+                                <i data-lucide="locate-fixed" class="w-3.5 h-3.5 text-cyan-400"></i>
+                                <span class="hidden sm:inline">Center</span>
+                            </button>
+
+                            <button onclick="toggleMapTheme()" id="map-theme-btn"
+                                class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 flex items-center gap-1 transition">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-400"></i>
+                                <span id="map-theme-label">Dark Tiles</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Leaflet Map Canvas -->
+                    <div id="gps-map" class="w-full h-[360px] sm:h-[440px] z-10"></div>
+
+                    <!-- Bottom Floating Coordinate Speed / Heading Strip -->
+                    <div
+                        class="bg-slate-950/90 border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <div class="flex items-center gap-4">
+                            <span>Speed: <strong id="telemetry-speed" class="text-slate-200 font-mono">0.0
+                                    km/h</strong></span>
+                            <span>Status: <strong id="telemetry-motion"
+                                    class="text-emerald-400">Stationary</strong></span>
+                            <span class="hidden sm:inline">Trail Points: <strong id="telemetry-trail-count"
+                                    class="text-cyan-400 font-mono">4</strong></span>
+                        </div>
+                        <button onclick="clearTrail()" class="text-slate-400 hover:text-white underline transition">
+                            Clear Movement Trail
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chronological Location History Log -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
+                                Chronological GPS Location History & Security Audit Log
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Real-time breadcrumb trail transmitted from linked
+                                mobile device</p>
+                        </div>
+                        <button onclick="exportLocationLogs()"
+                            class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            Export CSV Report
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400">
+                                    <th class="py-2.5 px-3">Timestamp</th>
+                                    <th class="py-2.5 px-3">Coordinates (Lat, Lng)</th>
+                                    <th class="py-2.5 px-3">Street / Area Estimate</th>
+                                    <th class="py-2.5 px-3">Event / Status</th>
+                                    <th class="py-2.5 px-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-log-body" class="divide-y divide-slate-800/60 text-xs">
+                                <!-- Dynamically Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- ==========================================
+         3. MODALS & TOAST NOTIFICATION SYSTEM
+    =========================================== -->
+
+    <!-- Bind New Device Modal -->
+    <div id="add-device-modal"
+        class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="smartphone" class="w-5 h-5 text-cyan-400"></i>
+                    Bind New Phone to Email
+                </h3>
+                <button onclick="closeAddDeviceModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">
+                Register an additional smartphone under <span id="modal-email-label"
+                    class="text-cyan-400 font-mono"></span> to monitor its GPS location remotely.
+            </p>
+            <form onsubmit="handleAddDevice(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Device Label / Model</label>
+                    <input type="text" id="new-device-name" required placeholder="e.g., iPhone 16 Pro Max"
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-cyan-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">IMEI Number (Optional)</label>
+                    <input type="text" id="new-device-imei" placeholder="15-digit IMEI (auto-generated if blank)"
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white focus:border-cyan-500 outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeAddDeviceModal()"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition">
+                        Link Device
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Remote Wipe Confirmation Modal -->
+    <div id="wipe-modal"
+        class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div
+                class="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white">Confirm Remote Factory Wipe?</h3>
+            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                This will permanently erase all photos, banking apps, messages, and personal files on <strong
+                    id="wipe-device-name" class="text-red-400">My Primary Phone</strong> as soon as it connects to
+                cellular or Wi-Fi data.
+            </p>
+            <div class="mt-4 p-3 rounded-xl bg-red-950/50 border border-red-500/20 text-[11px] text-red-200">
+                Warning: Once wiped, GPS tracking on this device may stop permanently. Only use if recovery is
+                impossible.
+            </div>
+            <div class="flex justify-end gap-2.5 mt-6">
+                <button onclick="closeWipeModal()"
+                    class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+                    Cancel
+                </button>
+                <button onclick="executeRemoteWipe()"
+                    class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/30 transition flex items-center gap-1.5">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    Erase Device Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification Container -->
+    <div id="toast-container"
+        class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- ==========================================
+         FIREBASE CLOUD CONFIGURATION MODAL
+    =========================================== -->
+    <div id="firebase-modal"
+        class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-cyan-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="cloud" class="w-5 h-5 text-cyan-400"></i>
+                    Firebase Cloud Sync Setup
+                </h3>
+                <button onclick="closeFirebaseModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed mb-3">
+                Paste your <strong>Firebase Web App Config</strong> (JSON or JS object) below to enable real-time
+                cross-device tracking across phones and computers.
+            </p>
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 mb-3 space-y-1">
+                <p><strong class="text-cyan-400">Quick Setup:</strong> Go to <code>console.firebase.google.com</code> →
+                    Create Project → Build → <strong>Firestore Database</strong> (Start in <em>Test Mode</em>) → Project
+                    Settings → Add Web App → Copy <code>firebaseConfig</code>.</p>
+            </div>
+            <form onsubmit="saveFirebaseConfigFromModal(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Firebase Config (JSON or JS
+                        Object)</label>
+                    <textarea id="firebase-config-input" rows="6" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "your-app.firebaseapp.com",
+  "projectId": "your-app",
+  "storageBucket": "your-app.appspot.com",
+  "messagingSenderId": "123456789",
+  "appId": "1:123456789:web:abcdef"
+}' class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl p-3 text-xs font-mono text-cyan-200 outline-none"></textarea>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                    <button type="button" onclick="resetFirebaseConfig()"
+                        class="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition">
+                        Disconnect Cloud
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeFirebaseModal()"
+                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                            class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 text-xs font-bold transition">
+                            Connect Firebase Cloud
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         FULL-SCREEN STOLEN / LOCKED OVERLAY (ON TARGET PHONE)
+    =========================================== -->
+    <div id="remote-lock-overlay"
+        class="hidden fixed inset-0 z-[60] bg-gradient-to-b from-red-950 via-slate-950 to-red-950 flex flex-col items-center justify-center p-6 text-center select-none">
+        <div
+            class="w-20 h-20 rounded-3xl bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 mb-6 animate-bounce">
+            <i data-lucide="shield-alert" class="w-10 h-10"></i>
+        </div>
+        <span
+            class="px-3 py-1 rounded-full bg-red-500 text-white text-xs font-bold tracking-widest uppercase mb-3 animate-pulse">
+            DEVICE LOCKED BY OWNER • NOLZZ_GPS
+        </span>
+        <h2 class="text-2xl sm:text-4xl font-extrabold text-white max-w-lg leading-tight">
+            THIS PHONE IS LOST OR STOLEN
+        </h2>
+        <div class="mt-6 p-5 rounded-2xl bg-slate-900/90 border border-red-500/40 max-w-md w-full shadow-2xl">
+            <p class="text-xs uppercase tracking-wider text-red-400 font-bold mb-1">Owner Recovery Message</p>
+            <p id="overlay-recovery-msg" class="text-base sm:text-lg font-semibold text-white">
+                STOLEN PHONE! Return to owner: +855-12-345-678
+            </p>
+            <div
+                class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>GPS Beacon: ACTIVE</span>
+                <span id="overlay-coords">11.5682, 104.9312</span>
+            </div>
+        </div>
+        <button onclick="unlockFromTargetPhone()"
+            class="mt-8 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-xs text-slate-400 hover:text-white transition">
+            Owner Override: Unlock Device
+        </button>
+    </div>
+
+    <!-- ==========================================
+         4. APPLICATION LOGIC, FIREBASE SYNC & SIMULATION ENGINE
+    =========================================== -->
+    <script type="module">
+        // Import Firebase v10 Modular SDKs from Google CDN
+        import { initializeApp, getApps, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import {
+            getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // =========================================================================
+        // OPTIONAL: PASTE YOUR FIREBASE CONFIG DIRECTLY HERE BEFORE HOSTING ON GITHUB
+        // (Or configure it live inside the app UI using the "Local Mode / Settings" button)
+        // =========================================================================
+        // const DEFAULT_FIREBASE_CONFIG = {
+        //     apiKey: "",
+        //     authDomain: "",
+        //     projectId: "",
+        //     storageBucket: "",
+        //     messagingSenderId: "",
+        //     appId: ""
+        // };
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIg7KZfDAXCPzbRqY1FyN1BvZDECbxDYg",
+            authDomain: "nolzz-gps.firebaseapp.com",
+            projectId: "nolzz-gps",
+            storageBucket: "nolzz-gps.firebasestorage.app",
+            messagingSenderId: "238993283194",
+            appId: "1:238993283194:web:96e46e5c5e1179616983c3",
+            measurementId: "G-M30BLQR1Z6"
+        };
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- APPLICATION STATE ---
+        const state = {
+            userEmail: 'alex.security@nolzz.io',
+            activeDeviceId: 'dev-1',
+            mapTheme: 'dark',
+            isSirenPlaying: false,
+            isSimulatingMove: false,
+            isBeaconActive: false,
+            beaconWatchId: null,
+            beaconPingCount: 0,
+            simInterval: null,
+            audioCtx: null,
+            sirenInterval: null,
+            firebaseConnected: false,
+            db: null,
+            unsubscribeDevices: null,
+            devices: [
+                {
+                    id: 'dev-1',
+                    name: 'My Primary Phone (Galaxy S24)',
+                    os: 'Android 15 • Nolzz Beacon v2.4',
+                    imei: '358942109482110',
+                    battery: 84,
+                    network: '5G Ultra • -68dBm',
+                    isLostMode: false,
+                    isLocked: false,
+                    isSirenOn: false,
+                    isWiped: false,
+                    lockMessage: 'STOLEN PHONE! Return to owner: +855-12-345-678',
+                    speed: 0,
+                    accuracy: 12,
+                    lat: 11.5682,
+                    lng: 104.9312,
+                    address: 'Preah Sisowath Quay, Daun Penh, Phnom Penh',
+                    lastPing: 'Just now',
+                    trail: [
+                        [11.5645, 104.9278],
+                        [11.5659, 104.9291],
+                        [11.5671, 104.9303],
+                        [11.5682, 104.9312]
+                    ],
+                    logs: [
+                        { time: '13:12:04', lat: 11.5682, lng: 104.9312, address: 'Preah Sisowath Quay, Daun Penh', event: 'Encrypted Heartbeat Ping', type: 'normal' },
+                        { time: '13:05:41', lat: 11.5671, lng: 104.9303, address: 'Street 130 & Riverside Blvd', event: 'Wi-Fi / 5G Cell Handover', type: 'normal' },
+                        { time: '12:52:19', lat: 11.5659, lng: 104.9291, address: 'Near Central Market East', event: 'Routine GPS Checkpoint', type: 'normal' },
+                        { time: '12:30:00', lat: 11.5645, lng: 104.9278, address: 'Norodom Blvd Sector 4', event: 'Email Beacon Authenticated', type: 'info' }
+                    ]
+                },
+                {
+                    id: 'dev-2',
+                    name: 'Work iPhone 15 Pro',
+                    os: 'iOS 18.2 • Nolzz Web Guard',
+                    imei: '354019882716409',
+                    battery: 49,
+                    network: 'Wi-Fi • Office_5G',
+                    isLostMode: false,
+                    isLocked: false,
+                    isSirenOn: false,
+                    isWiped: false,
+                    lockMessage: 'STOLEN PHONE! Return to owner: +855-12-345-678',
+                    speed: 0,
+                    accuracy: 8,
+                    lat: 11.5564,
+                    lng: 104.9282,
+                    address: 'Preah Monivong Blvd, BKK1, Phnom Penh',
+                    lastPing: '2 mins ago',
+                    trail: [
+                        [11.5550, 104.9270],
+                        [11.5564, 104.9282]
+                    ],
+                    logs: [
+                        { time: '13:10:15', lat: 11.5564, lng: 104.9282, address: 'Preah Monivong Blvd, BKK1', event: 'Stationary Guard Active', type: 'normal' },
+                        { time: '11:45:02', lat: 11.5550, lng: 104.9270, address: 'Street 310 & Monivong', event: 'Connected to Trusted Wi-Fi', type: 'info' }
+                    ]
+                }
+            ]
+        };
+
+        // --- FIREBASE INITIALIZATION & REAL-TIME FIRESTORE SYNC ---
+        function getStoredFirebaseConfig() {
+            try {
+                const saved = localStorage.getItem('nolzz_gps_firebase_config');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.apiKey && parsed.projectId) return parsed;
+                }
+            } catch (e) {
+                console.warn('Invalid stored Firebase config');
+            }
+            if (DEFAULT_FIREBASE_CONFIG.apiKey && DEFAULT_FIREBASE_CONFIG.projectId) {
+                return DEFAULT_FIREBASE_CONFIG;
+            }
+            return null;
+        }
+
+        async function initFirebase() {
+            const config = getStoredFirebaseConfig();
+            if (!config) {
+                state.firebaseConnected = false;
+                updateCloudStatusUI();
+                return false;
+            }
+
+            try {
+                const existingApps = getApps();
+                for (const app of existingApps) {
+                    await deleteApp(app);
+                }
+                const app = initializeApp(config);
+                state.db = getFirestore(app);
+                state.firebaseConnected = true;
+                updateCloudStatusUI();
+                return true;
+            } catch (err) {
+                console.error('Firebase init error:', err);
+                state.firebaseConnected = false;
+                updateCloudStatusUI();
+                showToast('Firebase connection failed. Check your config JSON.', 'error');
+                return false;
+            }
+        }
+
+        function sanitizeEmailKey(email) {
+            return email.toLowerCase().trim().replace(/[^a-z0-9@._-]/g, '_');
+        }
+
+        function subscribeToUserDevices() {
+            if (!state.firebaseConnected || !state.db) return;
+
+            if (state.unsubscribeDevices) {
+                state.unsubscribeDevices();
+            }
+
+            const emailKey = sanitizeEmailKey(state.userEmail);
+            const devicesRef = collection(state.db, 'nolzz_users', emailKey, 'devices');
+
+            state.unsubscribeDevices = onSnapshot(devicesRef, async (snapshot) => {
+                if (snapshot.empty) {
+                    // Seed initial default device into Firestore for new email user
+                    const initialDev = state.devices[0];
+                    await syncDeviceToFirestore(initialDev);
+                    return;
+                }
+
+                const cloudDevices = [];
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    cloudDevices.push({
+                        ...data,
+                        id: docSnap.id,
+                        trail: Array.isArray(data.trail) && data.trail.length > 0 ? data.trail : [[data.lat || 11.5682, data.lng || 104.9312]],
+                        logs: Array.isArray(data.logs) ? data.logs : []
+                    });
+                });
+
+                state.devices = cloudDevices;
+                if (!state.devices.some(d => d.id === state.activeDeviceId) && state.devices.length > 0) {
+                    state.activeDeviceId = state.devices[0].id;
+                }
+
+                // React to remote commands if THIS phone is acting as a Live Beacon
+                const activeDev = getActiveDevice();
+                if (state.isBeaconActive && activeDev) {
+                    handleIncomingRemoteCommands(activeDev);
+                }
+
+                renderAll(true);
+            }, (error) => {
+                console.error('Firestore snapshot error:', error);
+                showToast('Firestore sync error: Ensure Firestore rules allow read/write.', 'error');
+            });
+        }
+
+        async function syncDeviceToFirestore(device) {
+            if (!state.firebaseConnected || !state.db) return;
+            try {
+                const emailKey = sanitizeEmailKey(state.userEmail);
+                const docRef = doc(state.db, 'nolzz_users', emailKey, 'devices', device.id);
+                // Firestore does not support nested arrays directly in all structures; serialize trail safely
+                const safePayload = {
+                    ...device,
+                    trail: device.trail.map(pt => Array.isArray(pt) ? { lat: pt[0], lng: pt[1] } : pt),
+                    updatedAt: serverTimestamp()
+                };
+                await setDoc(docRef, safePayload, { merge: true });
+            } catch (err) {
+                console.error('Failed to sync device to Firestore:', err);
+            }
+        }
+
+        function handleIncomingRemoteCommands(device) {
+            // 1. Remote Lock / Stolen Overlay
+            const overlay = document.getElementById('remote-lock-overlay');
+            if (device.isLostMode || device.isLocked) {
+                document.getElementById('overlay-recovery-msg').textContent = device.lockMessage || 'STOLEN PHONE! Please return to owner.';
+                document.getElementById('overlay-coords').textContent = `${device.lat.toFixed(5)}, ${device.lng.toFixed(5)}`;
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+
+            // 2. Remote Siren Trigger
+            if (device.isSirenOn && !state.isSirenPlaying) {
+                startSiren(false);
+            } else if (!device.isSirenOn && state.isSirenPlaying) {
+                stopSiren(false);
+            }
+        }
+
+        function unlockFromTargetPhone() {
+            document.getElementById('remote-lock-overlay').classList.add('hidden');
+            const d = getActiveDevice();
+            d.isLocked = false;
+            d.isLostMode = false;
+            syncDeviceToFirestore(d);
+            renderAll();
+        }
+
+        function updateCloudStatusUI() {
+            const dot = document.getElementById('cloud-status-dot');
+            const text = document.getElementById('cloud-status-text');
+            const btn = document.getElementById('cloud-status-btn');
+
+            if (state.firebaseConnected) {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+                text.textContent = 'Cloud Live';
+                btn.className = 'px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-300 flex items-center gap-1.5 transition';
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                text.textContent = 'Local Mode';
+                btn.className = 'px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-amber-300 flex items-center gap-1.5 transition';
+            }
+        }
+
+        function openFirebaseModal() {
+            const existing = getStoredFirebaseConfig();
+            if (existing) {
+                document.getElementById('firebase-config-input').value = JSON.stringify(existing, null, 2);
+            }
+            document.getElementById('firebase-modal').classList.remove('hidden');
+        }
+
+        function closeFirebaseModal() {
+            document.getElementById('firebase-modal').classList.add('hidden');
+        }
+
+        async function saveFirebaseConfigFromModal(e) {
+            e.preventDefault();
+            let raw = document.getElementById('firebase-config-input').value.trim();
+            if (!raw) return;
+
+            try {
+                // Allow users to paste either valid JSON or JS object snippet from Firebase Console
+                raw = raw.replace(/const\s+\w+\s*=\s*/, '').replace(/;$/, '');
+                raw = raw.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+                raw = raw.replace(/'/g, '"');
+                const parsed = JSON.parse(raw);
+
+                if (!parsed.apiKey || !parsed.projectId) {
+                    throw new Error('Missing apiKey or projectId');
+                }
+
+                localStorage.setItem('nolzz_gps_firebase_config', JSON.stringify(parsed));
+                const ok = await initFirebase();
+                if (ok) {
+                    closeFirebaseModal();
+                    subscribeToUserDevices();
+                    showToast('Connected to Firebase Cloud! Cross-device tracking is now LIVE.', 'success');
+                }
+            } catch (err) {
+                showToast('Invalid Firebase config format. Please paste the firebaseConfig object.', 'error');
+            }
+        }
+
+        function resetFirebaseConfig() {
+            localStorage.removeItem('nolzz_gps_firebase_config');
+            if (state.unsubscribeDevices) state.unsubscribeDevices();
+            state.firebaseConnected = false;
+            state.db = null;
+            updateCloudStatusUI();
+            closeFirebaseModal();
+            showToast('Disconnected from Firebase. Switched to Local Mode.', 'info');
+        }
+
+        // --- LIVE PHONE BEACON MODE (CONTINUOUS HTML5 GPS TRANSMITTER) ---
+        async function toggleLiveBeacon() {
+            if (state.isBeaconActive) {
+                stopLiveBeacon();
+            } else {
+                startLiveBeacon();
+            }
+        }
+
+        async function startLiveBeacon() {
+            if (!navigator.geolocation) {
+                showToast('GPS Geolocation is not supported on this device/browser.', 'error');
+                return;
+            }
+
+            state.isBeaconActive = true;
+            state.beaconPingCount = 0;
+            updateBeaconUI();
+            showToast('Live GPS Beacon Activated! Broadcasting this phone\'s location...', 'success');
+
+            // Read real battery percentage if supported by browser
+            let batteryLevel = null;
+            if (navigator.getBattery) {
+                try {
+                    const bat = await navigator.getBattery();
+                    batteryLevel = Math.round(bat.level * 100);
+                } catch (e) { }
+            }
+
+            state.beaconWatchId = navigator.geolocation.watchPosition(
+                async (pos) => {
+                    const d = getActiveDevice();
+                    state.beaconPingCount++;
+                    document.getElementById('beacon-ping-counter').textContent = `${state.beaconPingCount} pings`;
+
+                    d.lat = Number(pos.coords.latitude.toFixed(6));
+                    d.lng = Number(pos.coords.longitude.toFixed(6));
+                    d.accuracy = Math.round(pos.coords.accuracy || 10);
+                    d.speed = pos.coords.speed ? Number((pos.coords.speed * 3.6).toFixed(1)) : 0;
+                    if (batteryLevel !== null) d.battery = batteryLevel;
+                    d.address = 'Live Mobile GPS Beacon Signal';
+                    d.lastPing = 'Live • Just now';
+
+                    // Normalize trail points
+                    const normalizedTrail = d.trail.map(pt => Array.isArray(pt) ? pt : [pt.lat, pt.lng]);
+                    normalizedTrail.push([d.lat, d.lng]);
+                    if (normalizedTrail.length > 30) normalizedTrail.shift();
+                    d.trail = normalizedTrail;
+
+                    d.logs.unshift({
+                        time: getCurrentTime(),
+                        lat: d.lat,
+                        lng: d.lng,
+                        address: d.address,
+                        event: `Live Beacon Ping #${state.beaconPingCount}`,
+                        type: d.isLostMode ? 'danger' : 'info'
+                    });
+                    if (d.logs.length > 20) d.logs.pop();
+
+                    await syncDeviceToFirestore(d);
+                    renderAll(true);
+                },
+                (err) => {
+                    showToast(`GPS Signal Error: ${err.message}. Ensure Location is Allowed & HTTPS is active.`, 'error');
+                    stopLiveBeacon();
+                },
+                { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+            );
+        }
+
+        function stopLiveBeacon() {
+            state.isBeaconActive = false;
+            if (state.beaconWatchId !== null) {
+                navigator.geolocation.clearWatch(state.beaconWatchId);
+                state.beaconWatchId = null;
+            }
+            updateBeaconUI();
+            showToast('Live GPS Beacon stopped.', 'info');
+        }
+
+        function updateBeaconUI() {
+            const toggle = document.getElementById('beacon-toggle');
+            const knob = document.getElementById('beacon-knob');
+            const pill = document.getElementById('beacon-live-pill');
+            const card = document.getElementById('beacon-card');
+
+            if (state.isBeaconActive) {
+                toggle.classList.remove('bg-slate-700');
+                toggle.classList.add('bg-emerald-500');
+                knob.classList.remove('translate-x-0');
+                knob.classList.add('translate-x-5');
+                pill.classList.remove('hidden');
+                card.classList.add('border-emerald-500/60');
+            } else {
+                toggle.classList.add('bg-slate-700');
+                toggle.classList.remove('bg-emerald-500');
+                knob.classList.add('translate-x-0');
+                knob.classList.remove('translate-x-5');
+                pill.classList.add('hidden');
+                card.classList.remove('border-emerald-500/60');
+            }
+        }
+
+        // Street checkpoints for realistic thief movement simulation
+        const simulatedWaypoints = [
+            { lat: 11.5698, lng: 104.9319, address: 'Street 106 & Preah Sisowath Quay', speed: 28 },
+            { lat: 11.5719, lng: 104.9301, address: 'Wat Phnom North Perimeter Rd', speed: 34 },
+            { lat: 11.5738, lng: 104.9268, address: 'France Blvd (St. 47) Junction', speed: 41 },
+            { lat: 11.5752, lng: 104.9235, address: 'Monivong Bridge South Approach', speed: 37 },
+            { lat: 11.5725, lng: 104.9210, address: 'Street 86, Toul Kork Border', speed: 22 },
+            { lat: 11.5691, lng: 104.9224, address: 'Russian Federation Blvd East', speed: 45 }
+        ];
+        let waypointIndex = 0;
+
+        // Leaflet Map Instances
+        let map = null;
+        let tileLayer = null;
+        let phoneMarker = null;
+        let accuracyCircle = null;
+        let movementPolyline = null;
+
+        const TILE_URLS = {
+            dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+        };
+
+        // --- HELPER: GET ACTIVE DEVICE ---
+        function getActiveDevice() {
+            const dev = state.devices.find(d => d.id === state.activeDeviceId) || state.devices[0];
+            if (dev && Array.isArray(dev.trail)) {
+                dev.trail = dev.trail.map(pt => Array.isArray(pt) ? pt : [pt.lat, pt.lng]);
+            }
+            return dev;
+        }
+
+        // --- AUTHENTICATION FLOW ---
+        function switchAuthTab(tab) {
+            const loginTab = document.getElementById('tab-login');
+            const regTab = document.getElementById('tab-register');
+            const deviceField = document.getElementById('register-device-field');
+            const submitText = document.querySelector('#auth-submit-btn span');
+
+            if (tab === 'login') {
+                loginTab.className = 'py-2 text-xs sm:text-sm font-semibold rounded-lg bg-slate-800 text-white shadow transition';
+                regTab.className = 'py-2 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
+                deviceField.classList.add('hidden');
+                submitText.textContent = 'Access GPS Command Center';
+            } else {
+                regTab.className = 'py-2 text-xs sm:text-sm font-semibold rounded-lg bg-slate-800 text-white shadow transition';
+                loginTab.className = 'py-2 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
+                deviceField.classList.remove('hidden');
+                submitText.textContent = 'Bind Phone & Launch Tracker';
+            }
+        }
+
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('auth-email').value.trim();
+            const newDeviceName = document.getElementById('auth-device-name').value.trim();
+
+            if (!emailInput) return;
+            state.userEmail = emailInput;
+
+            if (newDeviceName) {
+                const newId = 'dev-' + Date.now();
+                const newDeviceObj = {
+                    id: newId,
+                    name: newDeviceName,
+                    os: 'Mobile Beacon • Linked via Email',
+                    imei: '35' + Math.floor(1000000000000 + Math.random() * 9000000000000),
+                    battery: 96,
+                    network: '5G • -61dBm',
+                    isLostMode: false,
+                    isLocked: false,
+                    isSirenOn: false,
+                    isWiped: false,
+                    lockMessage: 'STOLEN PHONE! Return to owner: +855-12-345-678',
+                    speed: 0,
+                    accuracy: 10,
+                    lat: 11.5682,
+                    lng: 104.9312,
+                    address: 'Preah Sisowath Quay, Daun Penh, Phnom Penh',
+                    lastPing: 'Just now',
+                    trail: [[11.5682, 104.9312]],
+                    logs: [
+                        { time: getCurrentTime(), lat: 11.5682, lng: 104.9312, address: 'Preah Sisowath Quay, Daun Penh', event: 'Initial Email Binding Complete', type: 'info' }
+                    ]
+                };
+                state.devices.unshift(newDeviceObj);
+                state.activeDeviceId = newId;
+                await syncDeviceToFirestore(newDeviceObj);
+            }
+
+            await launchDashboard();
+            showToast(`Authenticated & bound to ${state.userEmail}`, 'success');
+        }
+
+        async function enterDemoMode() {
+            state.userEmail = 'demo.tracker@nolzz.io';
+            await launchDashboard();
+            showToast('Demo Mode Active — Connect Firebase anytime for real multi-phone tracking!', 'info');
+        }
+
+        async function launchDashboard() {
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.remove('hidden');
+
+            document.getElementById('display-user-email').textContent = state.userEmail;
+            document.getElementById('guide-email').textContent = state.userEmail;
+            document.getElementById('modal-email-label').textContent = state.userEmail;
+
+            await initFirebase();
+            if (state.firebaseConnected) {
+                subscribeToUserDevices();
+            }
+
+            initMap();
+            renderAll();
+        }
+
+        function logout() {
+            stopSiren(false);
+            stopThiefSimulation();
+            stopLiveBeacon();
+            if (state.unsubscribeDevices) state.unsubscribeDevices();
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('auth-view').classList.remove('hidden');
+            showToast('Session locked & signed out safely.', 'info');
+        }
+
+        // --- LEAFLET INTERACTIVE MAP INITIALIZATION ---
+        function initMap() {
+            if (map) {
+                setTimeout(() => map.invalidateSize(), 150);
+                return;
+            }
+
+            const device = getActiveDevice();
+            map = L.map('gps-map', {
+                zoomControl: true,
+                attributionControl: true
+            }).setView([device.lat, device.lng], 15);
+
+            tileLayer = L.tileLayer(TILE_URLS[state.mapTheme], {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap &copy; CARTO • Nolzz_GPS Satellite'
+            }).addTo(map);
+
+            // Accuracy Radius Circle
+            accuracyCircle = L.circle([device.lat, device.lng], {
+                color: '#06b6d4',
+                fillColor: '#06b6d4',
+                fillOpacity: 0.12,
+                weight: 1,
+                radius: device.accuracy * 4
+            }).addTo(map);
+
+            // Movement Trail Polyline
+            movementPolyline = L.polyline(device.trail, {
+                color: '#06b6d4',
+                weight: 3,
+                opacity: 0.8,
+                dashArray: '6, 6'
+            }).addTo(map);
+
+            // Custom Pulsing Radar Marker
+            phoneMarker = L.marker([device.lat, device.lng], {
+                icon: createRadarIcon(device.isLostMode)
+            }).addTo(map);
+
+            updateMapPopup();
+            setTimeout(() => map.invalidateSize(), 200);
+        }
+
+        function createRadarIcon(isStolen) {
+            return L.divIcon({
+                className: 'custom-gps-div-icon',
+                html: `
+                    <div class="gps-marker-container">
+                        <div class="gps-radar-ring ${isStolen ? 'stolen' : ''}"></div>
+                        <div class="gps-core-dot ${isStolen ? 'stolen' : ''}"></div>
+                    </div>
+                `,
+                iconSize: [48, 48],
+                iconAnchor: [24, 24]
+            });
+        }
+
+        function updateMapPopup() {
+            const d = getActiveDevice();
+            if (!phoneMarker) return;
+            const statusBadge = d.isLostMode
+                ? '<span style="color:#ef4444;font-weight:700;">● STOLEN / LOST ALERT</span>'
+                : '<span style="color:#10b981;font-weight:700;">● PROTECTED & ONLINE</span>';
+
+            phoneMarker.bindPopup(`
+                <div style="font-family:Inter,sans-serif;min-width:180px;color:#0f172a;">
+                    <div style="font-size:11px;margin-bottom:2px;">${statusBadge}</div>
+                    <div style="font-weight:700;font-size:13px;">${d.name}</div>
+                    <div style="font-size:11px;color:#475569;margin-top:2px;">${d.address}</div>
+                    <div style="font-family:monospace;font-size:10px;color:#0284c7;margin-top:4px;">
+                        ${d.lat.toFixed(5)}°, ${d.lng.toFixed(5)}°
+                    </div>
+                </div>
+            `);
+        }
+
+        function toggleMapTheme() {
+            state.mapTheme = state.mapTheme === 'dark' ? 'light' : 'dark';
+            tileLayer.setUrl(TILE_URLS[state.mapTheme]);
+            document.getElementById('map-theme-label').textContent = state.mapTheme === 'dark' ? 'Dark Tiles' : 'Street Tiles';
+        }
+
+        function recenterMap() {
+            const d = getActiveDevice();
+            if (map) {
+                map.flyTo([d.lat, d.lng], 16, { duration: 0.8 });
+                phoneMarker.openPopup();
+            }
+        }
+
+        function clearTrail() {
+            const d = getActiveDevice();
+            d.trail = [[d.lat, d.lng]];
+            syncDeviceToFirestore(d);
+            updateMapVisuals(false);
+            showToast('Movement trail cleared on map.', 'info');
+        }
+
+        // --- REAL BROWSER HTML5 GEOLOCATION SYNC ---
+        function useRealDeviceGPS() {
+            if (!navigator.geolocation) {
+                showToast('Geolocation is not supported by this browser.', 'error');
+                return;
+            }
+            showToast('Acquiring real HTML5 GPS satellite lock...', 'info');
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const d = getActiveDevice();
+                    d.lat = Number(pos.coords.latitude.toFixed(6));
+                    d.lng = Number(pos.coords.longitude.toFixed(6));
+                    d.accuracy = Math.round(pos.coords.accuracy || 15);
+                    d.address = 'Live HTML5 Browser Beacon Position';
+                    d.lastPing = 'Just now';
+                    d.trail.push([d.lat, d.lng]);
+                    d.logs.unshift({
+                        time: getCurrentTime(),
+                        lat: d.lat,
+                        lng: d.lng,
+                        address: d.address,
+                        event: 'Real Device GPS Synced',
+                        type: 'info'
+                    });
+                    await syncDeviceToFirestore(d);
+                    renderAll();
+                    recenterMap();
+                    showToast('Synced with your real physical GPS location!', 'success');
+                },
+                (err) => {
+                    showToast('Location permission denied or unavailable. Ensure HTTPS is active.', 'warning');
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        // --- ANTI-THEFT & LOST MODE CONTROLS ---
+        async function toggleLostMode() {
+            const d = getActiveDevice();
+            d.isLostMode = !d.isLostMode;
+            if (d.isLostMode) {
+                d.isLocked = true;
+                d.lockMessage = document.getElementById('lock-message-input').value.trim() || d.lockMessage;
+                d.lastPing = 'Live (5s interval)';
+                d.logs.unshift({
+                    time: getCurrentTime(),
+                    lat: d.lat,
+                    lng: d.lng,
+                    address: d.address,
+                    event: 'LOST / STOLEN MODE ACTIVATED',
+                    type: 'danger'
+                });
+                showToast(`STOLEN MODE ON: ${d.name} locked & high-frequency tracking started!`, 'error');
+                if (!state.isSimulatingMove && !state.firebaseConnected) {
+                    toggleThiefSimulation(true);
+                }
+            } else {
+                d.isLocked = false;
+                d.lastPing = 'Just now';
+                d.logs.unshift({
+                    time: getCurrentTime(),
+                    lat: d.lat,
+                    lng: d.lng,
+                    address: d.address,
+                    event: 'Lost Mode Deactivated by Owner',
+                    type: 'info'
+                });
+                showToast(`Lost Mode deactivated for ${d.name}.`, 'success');
+            }
+            await syncDeviceToFirestore(d);
+            renderAll();
+        }
+
+        async function broadcastMessage() {
+            const d = getActiveDevice();
+            const msg = document.getElementById('lock-message-input').value.trim();
+            if (!msg) return;
+            d.lockMessage = msg;
+            d.logs.unshift({
+                time: getCurrentTime(),
+                lat: d.lat,
+                lng: d.lng,
+                address: d.address,
+                event: `Lock Screen Msg: "${msg.substring(0, 28)}..."`,
+                type: 'warning'
+            });
+            await syncDeviceToFirestore(d);
+            renderLogs();
+            showToast('Recovery message broadcasted to phone lock screen!', 'success');
+        }
+
+        async function remoteLockDevice() {
+            const d = getActiveDevice();
+            d.isLocked = true;
+            d.lockMessage = document.getElementById('lock-message-input').value.trim() || d.lockMessage;
+            d.logs.unshift({
+                time: getCurrentTime(),
+                lat: d.lat,
+                lng: d.lng,
+                address: d.address,
+                event: 'Remote Passcode Lock Enforced',
+                type: 'warning'
+            });
+            await syncDeviceToFirestore(d);
+            renderAll();
+            showToast(`Remote Lock command sent to ${d.name}.`, 'success');
+        }
+
+        // --- WEB AUDIO API SYNTHESIZED ANTI-THEFT SIREN ---
+        function toggleSiren() {
+            if (state.isSirenPlaying) {
+                stopSiren(true);
+            } else {
+                startSiren(true);
+            }
+        }
+
+        async function startSiren(syncCloud = true) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!state.audioCtx) {
+                    state.audioCtx = new AudioContext();
+                }
+                if (state.audioCtx.state === 'suspended') {
+                    state.audioCtx.resume();
+                }
+
+                state.isSirenPlaying = true;
+                updateSirenUI();
+
+                const d = getActiveDevice();
+                if (syncCloud) {
+                    d.isSirenOn = true;
+                    d.logs.unshift({
+                        time: getCurrentTime(),
+                        lat: d.lat,
+                        lng: d.lng,
+                        address: d.address,
+                        event: 'Loud Anti-Theft Siren Triggered',
+                        type: 'danger'
+                    });
+                    await syncDeviceToFirestore(d);
+                    renderLogs();
+                }
+                showToast('ALARM SIREN ACTIVE — Playing high-decibel locator tone!', 'warning');
+
+                let highTone = true;
+                const playPulse = () => {
+                    if (!state.isSirenPlaying) return;
+                    const osc = state.audioCtx.createOscillator();
+                    const gain = state.audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(highTone ? 960 : 720, state.audioCtx.currentTime);
+                    highTone = !highTone;
+
+                    gain.gain.setValueAtTime(0.12, state.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, state.audioCtx.currentTime + 0.35);
+
+                    osc.connect(gain);
+                    gain.connect(state.audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(state.audioCtx.currentTime + 0.36);
+                };
+
+                playPulse();
+                state.sirenInterval = setInterval(playPulse, 380);
+            } catch (err) {
+                showToast('Audio siren visual alert active.', 'warning');
+            }
+        }
+
+        async function stopSiren(syncCloud = true) {
+            state.isSirenPlaying = false;
+            if (state.sirenInterval) {
+                clearInterval(state.sirenInterval);
+                state.sirenInterval = null;
+            }
+            updateSirenUI();
+            if (syncCloud) {
+                const d = getActiveDevice();
+                d.isSirenOn = false;
+                await syncDeviceToFirestore(d);
+            }
+        }
+
+        function updateSirenUI() {
+            const btn = document.getElementById('siren-btn');
+            const text = document.getElementById('siren-btn-text');
+            const status = document.getElementById('siren-status');
+
+            if (state.isSirenPlaying) {
+                btn.className = 'w-full p-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs sm:text-sm flex items-center justify-between transition animate-pulse shadow-lg shadow-amber-500/30';
+                text.textContent = 'Stop Loud Alarm / Siren';
+                status.textContent = 'RINGING';
+                status.className = 'text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-slate-950 text-amber-400';
+            } else {
+                btn.className = 'w-full p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-xs sm:text-sm flex items-center justify-between transition group';
+                text.textContent = 'Trigger Loud Alarm / Siren';
+                status.textContent = 'OFF';
+                status.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-950 text-slate-400';
+            }
+        }
+
+        // --- THIEF MOVEMENT SIMULATION ---
+        function toggleThiefSimulation(forceStart = false) {
+            if (state.isSimulatingMove && !forceStart) {
+                stopThiefSimulation();
+                showToast('Movement simulation paused.', 'info');
+            } else {
+                if (state.isSimulatingMove) return;
+                state.isSimulatingMove = true;
+                updateSimUI();
+                showToast('Simulating live GPS movement along city streets...', 'info');
+
+                stepSimulation();
+                state.simInterval = setInterval(stepSimulation, 3000);
+            }
+        }
+
+        function stopThiefSimulation() {
+            state.isSimulatingMove = false;
+            if (state.simInterval) {
+                clearInterval(state.simInterval);
+                state.simInterval = null;
+            }
+            const d = getActiveDevice();
+            d.speed = 0;
+            updateSimUI();
+            renderTelemetry();
+        }
+
+        async function stepSimulation() {
+            const d = getActiveDevice();
+            const wp = simulatedWaypoints[waypointIndex % simulatedWaypoints.length];
+            waypointIndex++;
+
+            const jitterLat = (Math.random() - 0.5) * 0.0004;
+            const jitterLng = (Math.random() - 0.5) * 0.0004;
+
+            d.lat = Number((wp.lat + jitterLat).toFixed(5));
+            d.lng = Number((wp.lng + jitterLng).toFixed(5));
+            d.address = wp.address;
+            d.speed = wp.speed;
+            d.accuracy = Math.floor(8 + Math.random() * 9);
+            d.lastPing = 'Live • Now';
+            if (d.battery > 5 && Math.random() > 0.6) d.battery -= 1;
+
+            d.trail.push([d.lat, d.lng]);
+            if (d.trail.length > 25) d.trail.shift();
+
+            d.logs.unshift({
+                time: getCurrentTime(),
+                lat: d.lat,
+                lng: d.lng,
+                address: d.address,
+                event: d.isLostMode ? `Stolen Tracking (${d.speed} km/h)` : `Live Transit Ping (${d.speed} km/h)`,
+                type: d.isLostMode ? 'danger' : 'normal'
+            });
+            if (d.logs.length > 15) d.logs.pop();
+
+            await syncDeviceToFirestore(d);
+            renderAll(true);
+        }
+
+        function updateSimUI() {
+            const btnText = document.getElementById('simulate-btn-text');
+            const badge = document.getElementById('simulate-badge');
+            const topIndicator = document.getElementById('sim-indicator');
+
+            if (state.isSimulatingMove) {
+                btnText.textContent = 'Stop Movement Simulation';
+                badge.textContent = 'ACTIVE';
+                badge.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-indigo-500 text-white font-bold animate-pulse';
+                topIndicator.classList.remove('hidden');
+            } else {
+                btnText.textContent = 'Simulate Thief Movement';
+                badge.textContent = 'TEST';
+                badge.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-950 text-indigo-400';
+                topIndicator.classList.add('hidden');
+            }
+        }
+
+        // --- REMOTE WIPE MODAL ---
+        function openWipeModal() {
+            const d = getActiveDevice();
+            document.getElementById('wipe-device-name').textContent = d.name;
+            document.getElementById('wipe-modal').classList.remove('hidden');
+        }
+
+        function closeWipeModal() {
+            document.getElementById('wipe-modal').classList.add('hidden');
+        }
+
+        async function executeRemoteWipe() {
+            const d = getActiveDevice();
+            d.isWiped = true;
+            d.isLocked = true;
+            d.logs.unshift({
+                time: getCurrentTime(),
+                lat: d.lat,
+                lng: d.lng,
+                address: d.address,
+                event: 'REMOTE FACTORY WIPE COMMAND QUEUED',
+                type: 'danger'
+            });
+            await syncDeviceToFirestore(d);
+            closeWipeModal();
+            renderAll();
+            showToast(`Remote Wipe initiated for ${d.name}. Personal data sanitization triggered.`, 'error');
+        }
+
+        // --- ADD DEVICE MODAL ---
+        function openAddDeviceModal() {
+            document.getElementById('add-device-modal').classList.remove('hidden');
+        }
+
+        function closeAddDeviceModal() {
+            document.getElementById('add-device-modal').classList.add('hidden');
+        }
+
+        async function handleAddDevice(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-device-name').value.trim();
+            const imeiInput = document.getElementById('new-device-imei').value.trim();
+            if (!name) return;
+
+            const newId = 'dev-' + Date.now();
+            const offsetLat = (Math.random() - 0.5) * 0.015;
+            const offsetLng = (Math.random() - 0.5) * 0.015;
+            const lat = Number((11.5682 + offsetLat).toFixed(5));
+            const lng = Number((104.9312 + offsetLng).toFixed(5));
+
+            const newDev = {
+                id: newId,
+                name: name,
+                os: 'Mobile Beacon • Linked via Email',
+                imei: imeiInput || ('35' + Math.floor(1000000000000 + Math.random() * 9000000000000)),
+                battery: 92,
+                network: '5G • -64dBm',
+                isLostMode: false,
+                isLocked: false,
+                isSirenOn: false,
+                isWiped: false,
+                lockMessage: 'STOLEN PHONE! Return to owner: +855-12-345-678',
+                speed: 0,
+                accuracy: 11,
+                lat: lat,
+                lng: lng,
+                address: 'Phnom Penh Metro Sector',
+                lastPing: 'Just now',
+                trail: [[lat, lng]],
+                logs: [
+                    { time: getCurrentTime(), lat: lat, lng: lng, address: 'Phnom Penh Metro Sector', event: 'Device Bound to Email', type: 'info' }
+                ]
+            };
+
+            state.devices.push(newDev);
+            state.activeDeviceId = newId;
+            await syncDeviceToFirestore(newDev);
+
+            document.getElementById('new-device-name').value = '';
+            document.getElementById('new-device-imei').value = '';
+            closeAddDeviceModal();
+            renderAll(true);
+            showToast(`${name} successfully linked to ${state.userEmail}!`, 'success');
+        }
+
+        // --- SELECT DEVICE ---
+        function selectDevice(id) {
+            state.activeDeviceId = id;
+            renderAll(true);
+        }
+
+        // --- RENDER FUNCTIONS ---
+        function renderAll(panMap = false) {
+            renderDeviceList();
+            renderControlsState();
+            renderTelemetry();
+            updateMapVisuals(panMap);
+            renderLogs();
+            lucide.createIcons();
+        }
+
+        function renderDeviceList() {
+            const container = document.getElementById('device-list');
+            document.getElementById('device-count').textContent = state.devices.length;
+
+            container.innerHTML = state.devices.map(d => {
+                const isSelected = d.id === state.activeDeviceId;
+                const borderClass = d.isLostMode
+                    ? 'border-red-500/60 bg-red-950/20'
+                    : isSelected
+                        ? 'border-cyan-500/60 bg-slate-800/80'
+                        : 'border-slate-800 bg-slate-950/60 hover:border-slate-700';
+
+                const statusPill = d.isWiped
+                    ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">WIPED</span>'
+                    : d.isLostMode
+                        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500 text-white animate-pulse">STOLEN</span>'
+                        : d.isLocked
+                            ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">LOCKED</span>'
+                            : '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">ONLINE</span>';
+
+                return `
+                    <button onclick="selectDevice('${d.id}')" class="w-full text-left p-3 rounded-xl border ${borderClass} transition flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-xs sm:text-sm text-white truncate">${d.name}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 truncate mt-0.5">${d.os}</p>
+                            <div class="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-slate-400">
+                                <span>🔋 ${d.battery}%</span>
+                                <span>•</span>
+                                <span>${d.lastPing}</span>
+                            </div>
+                        </div>
+                        <div class="shrink-0 flex flex-col items-end gap-1.5">
+                            ${statusPill}
+                            ${isSelected ? '<span class="text-[10px] text-cyan-400 font-medium">Tracking</span>' : ''}
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderControlsState() {
+            const d = getActiveDevice();
+            const toggle = document.getElementById('lost-mode-toggle');
+            const knob = document.getElementById('lost-mode-knob');
+            const banner = document.getElementById('stolen-banner');
+            const globalBadge = document.getElementById('global-status-badge');
+            const controlsCard = document.getElementById('controls-card');
+
+            if (d.isLostMode) {
+                toggle.classList.remove('bg-slate-700');
+                toggle.classList.add('bg-red-600');
+                toggle.setAttribute('aria-checked', 'true');
+                knob.classList.remove('translate-x-0');
+                knob.classList.add('translate-x-5');
+
+                banner.classList.remove('hidden');
+                controlsCard.classList.add('stolen-alert-glow');
+
+                globalBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 flex items-center gap-1.5 animate-pulse';
+                globalBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> STOLEN ALERT';
+            } else {
+                toggle.classList.add('bg-slate-700');
+                toggle.classList.remove('bg-red-600');
+                toggle.setAttribute('aria-checked', 'false');
+                knob.classList.add('translate-x-0');
+                knob.classList.remove('translate-x-5');
+
+                banner.classList.add('hidden');
+                controlsCard.classList.remove('stolen-alert-glow');
+
+                globalBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5';
+                globalBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> PROTECTED';
+            }
+        }
+
+        function renderTelemetry() {
+            const d = getActiveDevice();
+            document.getElementById('telemetry-battery').textContent = `${d.battery}%`;
+            document.getElementById('telemetry-network').textContent = d.network;
+            document.getElementById('telemetry-imei').textContent = d.imei;
+            document.getElementById('telemetry-ping').textContent = d.lastPing;
+
+            document.getElementById('map-device-title').textContent = d.name;
+            document.getElementById('map-accuracy-badge').textContent = `±${d.accuracy}m Accuracy`;
+            document.getElementById('map-address').textContent = d.address;
+            document.getElementById('map-coords').textContent = `${d.lat.toFixed(4)}° N, ${d.lng.toFixed(4)}° E`;
+
+            document.getElementById('telemetry-speed').textContent = `${d.speed.toFixed(1)} km/h`;
+            document.getElementById('telemetry-motion').textContent = d.speed > 0 ? 'Moving (Transit)' : 'Stationary';
+            document.getElementById('telemetry-motion').className = d.speed > 0 ? 'text-amber-400 font-semibold' : 'text-emerald-400';
+            document.getElementById('telemetry-trail-count').textContent = d.trail.length;
+        }
+
+        function updateMapVisuals(panToDevice = false) {
+            if (!map || !phoneMarker) return;
+            const d = getActiveDevice();
+            const color = d.isLostMode ? '#ef4444' : '#06b6d4';
+
+            phoneMarker.setLatLng([d.lat, d.lng]);
+            phoneMarker.setIcon(createRadarIcon(d.isLostMode));
+            updateMapPopup();
+
+            accuracyCircle.setLatLng([d.lat, d.lng]);
+            accuracyCircle.setRadius(d.accuracy * 4);
+            accuracyCircle.setStyle({ color: color, fillColor: color });
+
+            movementPolyline.setLatLngs(d.trail);
+            movementPolyline.setStyle({ color: color });
+
+            if (panToDevice) {
+                map.panTo([d.lat, d.lng], { animate: true, duration: 0.6 });
+            }
+        }
+
+        function renderLogs() {
+            const d = getActiveDevice();
+            const tbody = document.getElementById('history-log-body');
+
+            tbody.innerHTML = d.logs.map(log => {
+                let badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+                if (log.type === 'danger') badgeClass = 'bg-red-500/15 text-red-400 border-red-500/30 font-semibold';
+                if (log.type === 'warning') badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                if (log.type === 'info') badgeClass = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-2.5 px-3 font-mono text-slate-400 whitespace-nowrap">${log.time}</td>
+                        <td class="py-2.5 px-3 font-mono text-cyan-300 whitespace-nowrap">${log.lat.toFixed(5)}, ${log.lng.toFixed(5)}</td>
+                        <td class="py-2.5 px-3 text-slate-200 max-w-[240px] truncate">${log.address}</td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded-md text-[11px] border ${badgeClass}">${log.event}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                            <button onclick="focusLogPoint(${log.lat}, ${log.lng})" class="text-cyan-400 hover:text-cyan-300 font-medium underline">
+                                Locate
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function focusLogPoint(lat, lng) {
+            if (map) {
+                map.flyTo([lat, lng], 17, { duration: 0.7 });
+                showToast(`Centered map on ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'info');
+            }
+        }
+
+        // --- UTILITIES: CLIPBOARD, CSV EXPORT, TOASTS ---
+        function copyCoordinates() {
+            const d = getActiveDevice();
+            const text = `${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}`;
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast(`Copied GPS Coordinates: ${text}`, 'success');
+        }
+
+        function exportLocationLogs() {
+            const d = getActiveDevice();
+            let csv = 'Timestamp,Latitude,Longitude,Address,Event\n';
+            d.logs.forEach(l => {
+                csv += `"${l.time}",${l.lat},${l.lng},"${l.address}","${l.event}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Nolzz_GPS_${d.name.replace(/\s+/g, '_')}_Logs.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Location evidence report exported as CSV.', 'success');
+        }
+
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toTimeString().split(' ')[0];
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const styles = {
+                success: 'bg-slate-900 border-emerald-500/50 text-emerald-300',
+                error: 'bg-red-950 border-red-500/60 text-red-200',
+                warning: 'bg-slate-900 border-amber-500/50 text-amber-300',
+                info: 'bg-slate-900 border-cyan-500/50 text-cyan-200'
+            };
+
+            const icons = {
+                success: 'check-circle-2',
+                error: 'alert-octagon',
+                warning: 'bell-ring',
+                info: 'info'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-xs font-medium transition-all duration-300 transform translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+            toast.innerHTML = `
+                <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0"></i>
+                <span class="flex-1">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3600);
+        }
+
+        // Expose functions globally for inline HTML onclick handlers
+        window.switchAuthTab = switchAuthTab;
+        window.handleAuthSubmit = handleAuthSubmit;
+        window.enterDemoMode = enterDemoMode;
+        window.logout = logout;
+        window.toggleMapTheme = toggleMapTheme;
+        window.recenterMap = recenterMap;
+        window.clearTrail = clearTrail;
+        window.useRealDeviceGPS = useRealDeviceGPS;
+        window.toggleLostMode = toggleLostMode;
+        window.broadcastMessage = broadcastMessage;
+        window.remoteLockDevice = remoteLockDevice;
+        window.toggleSiren = toggleSiren;
+        window.toggleThiefSimulation = toggleThiefSimulation;
+        window.openWipeModal = openWipeModal;
+        window.closeWipeModal = closeWipeModal;
+        window.executeRemoteWipe = executeRemoteWipe;
+        window.openAddDeviceModal = openAddDeviceModal;
+        window.closeAddDeviceModal = closeAddDeviceModal;
+        window.handleAddDevice = handleAddDevice;
+        window.selectDevice = selectDevice;
+        window.focusLogPoint = focusLogPoint;
+        window.copyCoordinates = copyCoordinates;
+        window.exportLocationLogs = exportLocationLogs;
+        window.openFirebaseModal = openFirebaseModal;
+        window.closeFirebaseModal = closeFirebaseModal;
+        window.saveFirebaseConfigFromModal = saveFirebaseConfigFromModal;
+        window.resetFirebaseConfig = resetFirebaseConfig;
+        window.toggleLiveBeacon = toggleLiveBeacon;
+        window.unlockFromTargetPhone = unlockFromTargetPhone;
+    </script>
+</body>
+
+</html>
